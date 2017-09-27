@@ -1,45 +1,75 @@
-import events from '../events';
+import eventsConstructor from '../events';
 import $ from 'jquery';
 import birdTemplate from './birdTemplate';
 import difference from 'lodash.difference';
+import uniqBy from 'lodash/uniqBy';
+import filter from 'lodash/filter';
+import findInArray from 'lodash/find';
+
 
 // ============= MAIN ================
+// Global variables containing all species entry in DB
+const allSpeciesFromDB = null;
 
-export default function main() {
-    console.log('hello Im main');
+// INIT function for page "searchspecies"
+export function initSearchPage() {
+    var events = eventsConstructor();
     var template = Handlebars.compile(birdTemplate);
-    // print(template({'birds': [{'name':'aaaaaa'}, {'name': 'bbbbbbbb'}]}))
 
-    var inputFormObj = inputForm();
-    var speMod = speciesModel();
-    var speView = speciesView(template);
+    var inputFormObj = inputForm($('#search-input'), $('#suggestions-container'), events);
+    var speMod = speciesModel(events);
+    var speView = speciesView(template, $('#result-row'));
 
     events.on('inputChangeEvent', speMod.updateSuggestionsArray);
     events.on('speciesUpdatedEvent', inputFormObj.updateCurrentSuggestions);
     events.on('speciesUpdatedEvent', speView.renderSpecies);
 }
 
+// INIT function for navbar search field, every pages
+export function initNavbarSearch(windowSize) {
+    let events, inputFormObj, speMod;
+    if (windowSize == "large") {
+        events = eventsConstructor();
+        inputFormObj = inputForm($('.nav-search-input'), $('.nav-suggestions-container'), events, $('#input-arrow'));
+        speMod = speciesModel(events);
+
+        events.on('inputChangeEvent', speMod.updateSuggestionsArray);
+        events.on('speciesUpdatedEvent', inputFormObj.updateCurrentSuggestions);
+    } else if (windowSize == "small") {
+        events = eventsConstructor();
+        inputFormObj = inputForm($('.small-nav-search-input'), $('.small-nav-suggestions-container'), events, $('#input-arrow'));
+        speMod = speciesModel(events);
+
+        events.on('inputChangeEvent', speMod.updateSuggestionsArray);
+        events.on('speciesUpdatedEvent', inputFormObj.updateCurrentSuggestions);
+    }
+
+}
+
+
 // ============= SPECIES MODEL ================
 
-function speciesModel() {
+
+function speciesModel(events) {
     var allSpecies = hydrateSpecies();
     var allPatternMatchingSpecies = [];
     function uppdateSuggestionsArray(currentString) {
-        allPatternMatchingSpecies = [];
-        var regexString = '^' + currentString ;
-        var regex = new RegExp(regexString, 'i');
-        for (var i = 0; i < allSpecies.length; i++) {
-            if (regex.test(allSpecies[i])) {
-                allPatternMatchingSpecies.push(allSpecies[i]);
+            allPatternMatchingSpecies = [];
+            var regexString = '^' + currentString.trim() ;
+            var regex = new RegExp(regexString, 'i');
+            for (var i = 0; i < allSpecies.length; i++) {
+                if (regex.test(allSpecies[i].scientificName)) {
+                    allPatternMatchingSpecies.push(allSpecies[i]);
+                }
             }
-        }
-        events.emit('speciesUpdatedEvent', allPatternMatchingSpecies);
+            events.emit('speciesUpdatedEvent', allPatternMatchingSpecies);
+            print(allPatternMatchingSpecies);
     }
+
     // makes ajax query and hydrate allSpeciesArray
     function hydrateSpecies() {
-        //TODO: ajax query
-        //fixte
-        return getAllSpeciesFixture();
+
+        return allSpeciesFromDB || getAllSpeciesFromDB();
     }
     return {
         allCurrentSuggestionsArray: allPatternMatchingSpecies,
@@ -49,27 +79,11 @@ function speciesModel() {
 
 // ============= SPECIES VIEW ================
 
-function speciesView(template) {
-    const birdTemplate = template;
-    const $resultRow = $('#result-row');
-    // to be hydrated just before speciesModel.allPatternMatchingSpecies is updated;
-    // then the difference is made between prev state et new state for optimization reasons for rendering AND DO NOT FORGET TO REMOVE
-    // diff PREV - NEW => remove
-
-    let allPatternMatchingSpeciesPrev = [];
+function speciesView(template, $resultRow) {
 
     function renderSpecies(speciesToRender) {
         $resultRow.empty();
-        function birdObject(birdName) {
-            this.name = birdName;
-        }
-        let birdObjectsArray = [];
-        for (let i = 0; i < speciesToRender.length; i++) {
-            let bird = new birdObject(speciesToRender[i]);
-            birdObjectsArray.push(bird);
-        }
-        let html = birdTemplate({'birds': birdObjectsArray});
-        print(html)
+        let html = template({'birds': speciesToRender});
         $resultRow.append(html);
     }
     return {
@@ -78,28 +92,50 @@ function speciesView(template) {
 }
 
 
-function inputForm() {
+function inputForm($input, $suggestionsContainer, events, $inputArrow) {
+    var currentSuggestionsArrayWithId = [];
     var currentSuggestionsArray = [];
-    var $input = $('#search-input');
-    var $suggestionsContainer = $('#suggestions-container');
     var currentlyHighlighted = -1;
 
-    //dom events binding
+    console.log($input)
+    //DOM EVENTS BINDING (INPUT)
     $input.on('input', function(e){
+        print('input')
         currentlyHighlighted = -1;
         var currentValue = $(e.target).val();
         events.emit('inputChangeEvent', currentValue);
     });
     $input.on('focusout', function() {
+        // check if element is selected
+        if ($suggestionsContainer.find('li').is('.selected')) {
+            $input.val($('.selected').text());
+            events.emit("inputChangeEvent", $input.val());
+            let id = currentSuggestionsArrayWithId.find((el) => el.scientificName == $input.val().trim()).id;
+            redirectToSpeciessearch(id);
+        }
         $suggestionsContainer.empty();
         currentlyHighlighted = [];
     });
     $(document).on('keydown', function(e) {
-        print('keydown')
         var keyPressed = String.fromCharCode(e.keyCode);
         var suggestionsLength =  currentSuggestionsArray.length;
 
-        if (suggestionsLength !== 0) {
+        if (suggestionsLength !== 0 && $input.is(":focus")) {
+            // si e.which == 13 -> $('.selected').text() dans input.val()
+            // ENTER
+            if (e.which == 13) {
+                // vérifier qu'un élément a bien la classe selected
+                if ($('.selected').length != 0) {
+                    $input.val($('.selected').text());
+                    events.emit("inputChangeEvent", $input.val());
+                    let id = currentSuggestionsArrayWithId.find(el => el.scientificName == $input.val().trim()).id;
+                    redirectToSpeciessearch(id);
+
+                } else {
+                    let id = currentSuggestionsArrayWithId.find(el => el.scientificName.toUpperCase() == $input.val().trim().toUpperCase()).id;
+                    if (id || id == 0) redirectToSpeciessearch(id);
+                }
+            }
             // UP
             if (keyPressed == '&') {
                 if (currentlyHighlighted !== 0) {
@@ -115,25 +151,66 @@ function inputForm() {
                 highlightSuggestion(suggestionsLength)
             }
         } else {
+            if ($input.is(":focus") && e.which == 13) {
+                redirectToSpeciessearch();
+            }
         }
     });
+    // DOM EVENT BINDING ($SUBMITBUTTON)
+    if ($inputArrow) {
+        $inputArrow.on('click', function() {
+            let inputVal = $input.val().trim();
+            if (currentSuggestionsArray.length == 0) {
+                redirectToSpeciessearch();
+            } else {
+                currentSuggestionsArray.forEach(function(suggestion){
+                    let trimmed = suggestion.trim();
+                    let regex = new RegExp(trimmed, 'i');
+                    if(regex.test(inputVal)) {
+                        let id = currentSuggestionsArrayWithId.find((el) => el.scientificName == suggestion).id;
+                        redirectToSpeciessearch(id);
+                    } else {
+                        redirectToSpeciessearch();
+                    }
+                })
+            }
+
+        });
+    }
+
+    // redirects by manipulating speciesSearchLink and triggering click
+    function redirectToSpeciessearch(id) {
+        let ssl = document.getElementById('speciesSearchLink');
+        if (id || id == 0) {
+            window.location = ssl.href + '/' + id;
+        } else {
+            window.location = ssl.href;
+        }
+    }
 
     function updateCurrentSuggestions(allPatternMAtchingSpecies) {
-        currentSuggestionsArray = allPatternMAtchingSpecies.slice(0,4);
-        print('suggestions updated')
+        currentSuggestionsArrayWithId = allPatternMAtchingSpecies;
+        currentSuggestionsArray = allPatternMAtchingSpecies.slice(0,4).map((bird) => bird.scientificName);
         renderSuggestions(currentSuggestionsArray);
     }
 
     // view functions
     function renderSuggestions(currentSuggestionsArray) {
+        print('suggestions rendered')
         $suggestionsContainer.empty();
         for (var i = 0; i < currentSuggestionsArray.length; i++) {
             var rawSuggestion = currentSuggestionsArray[i];
             var suggestion = '<li class="suggestion">' + rawSuggestion + '</li>';
             $(suggestion).appendTo($input)
-            // print(suggestion)
             $suggestionsContainer.append(suggestion);
         }
+        $suggestionsContainer.find('li').on('mouseenter', function(){
+            let $this = $(this);
+            $this.addClass('selected');
+            $this.on('mouseleave', function(){
+                $this.removeClass('selected');
+            });
+        });
     }
     function highlightSuggestion() {
         // if (index !== -1) {// new highlight
@@ -153,23 +230,82 @@ function inputForm() {
     }
 }
 
+// UTILS
+
+function print(string) {
+    console.log(string)
+}
 
 
 
+// AJAX cmd  ->  [bird, bird, ...]
+function getAllSpeciesFromDB() {
 
-
-function getAllSpeciesFixture() {
+    // find homepage url to make url to api/getallbirds
+    const homepageUrl = $('#homepage-url').attr('href') || '';
+    const apiUrl = homepageUrl + 'api/getallbirds';
+    print(apiUrl)
     var species = [];
-    $.get('api/getallbirds', function(data){
-        data.data.forEach(function(bird){
-            var parsed = JSON.parse(bird)
-            species.push(parsed.scientificName)
+    $.get(apiUrl, function(data){
+        data.species.forEach(function(bird){
+            var parsed = JSON.parse(bird);
+
+            // Strip first descriptor if it's included in scientificName
+            let scientificName = parsed.scientificName;
+            var indexOfParenthesis = scientificName.indexOf("(");
+            if (indexOfParenthesis !== -1) {
+                scientificName = scientificName.substr(0, indexOfParenthesis).trim();
+            }
+            let imagePath = imagePath || null;
+            let speciesObject = {
+                scientificName: scientificName,
+                id: parsed.id,
+                imagePath: imagePath
+            };
+            species.push(speciesObject);
+        });
+        var semiParsedObservations = [];
+        data.observations.forEach(function(observation){
+            semiParsedObservations.push(JSON.parse(observation));
+        });
+        var fullyParsedObservations = []
+        semiParsedObservations.forEach(function(observation) {
+            let species = JSON.parse(observation.species);
+            observation.species = species;
+            fullyParsedObservations.push(observation)
         })
+        let picturesArray = picturesAndIdFromObservationsArray(fullyParsedObservations);
+        species = mergeArrays(species, picturesArray, window.location.origin)
+        print(species)
     });
     return species;
 }
 
 
-function print(string) {
-    console.log(string)
+
+// [observation : {..., species : {...}, pictures: ""}, ...]  ->   [{"id1", "picture1"}, ...]
+function picturesAndIdFromObservationsArray(observationsArray) {
+
+     return uniqBy(filter(observationsArray, observation => observation.pictures != null), "species.id")
+        .map(observation => {
+            let pic = {};
+            pic.id = observation.species.id;
+            pic.picture = observation.pictures;
+            return pic
+        })
+
 }
+
+function mergeArrays(speciesArray, picturesArray, baseUrl) {
+
+    return speciesArray.map(species => {
+        let pictureObject = findInArray(picturesArray, picture => picture.id == species.id)
+        if (pictureObject) species.imagePath = baseUrl + '/uploads/pictures/' + pictureObject.picture;
+        else species.imagePath = null
+        return species
+    })
+
+}
+
+
+
