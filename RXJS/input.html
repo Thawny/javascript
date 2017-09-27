@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+
+<input type="text" id="input">
+<p id="p"></p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/5.4.3/Rx.min.js"></script>
+<script>
+    var input$ = Rx.Observable.fromEvent(document.getElementById('input'), 'input');
+    var val$ = input$.map(e => e.target.value).startWith('Rien');
+    val$.subscribe(val => document.getElementById('p').innerHTML = (val ? val : "Rien"))
+</script>
+</body>
+</html>

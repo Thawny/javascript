@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/5.4.3/Rx.min.js"></script>
+<script>
+    // var clicks = Rx.Observable.fromEvent(document, 'click');
+    // var interval = Rx.Observable.interval(1000);
+    // var buffered = interval.buffer(clicks);
+    // buffered.subscribe(x => console.log(x));
+
+    // var acc = [];
+    // var clicks = Rx.Observable.fromEvent(document, 'click');
+    // clicks.subscribe(click => {
+    //     acc.push(click)
+    //     console.log(acc)
+    // })
+                                                        // ou acc.concat(curr)
+    var range = Rx.Observable.range(1,10).scan((acc, curr) => [curr, ...acc], [])
+    range.subscribe(x => console.log(x))
+</script>
+</body>
+</html>

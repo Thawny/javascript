@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+<style>
+</style>
+<button class="incr" id="incr">+</button>
+<button class="decr" id="decr">-</button>
+<div id="res">0</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/5.4.3/Rx.min.js"></script>
+<script>
+
+    // var obs = Rx.Observable.fromEvent(window, "load").startWith('first').subscribe((x) => console.log(x))
+    // var observable = Rx.Observable.range(1,10).startWith('first').subscribe((x) => console.log(x));
+    // subscription.unsubscribe()
+    // var clickStream = Rx.Observable.fromEvent(document.getElementById('btn'), "click");
+    //                         .comineLatest()
+    // clickStream.subscribe((ev) => console.log(ev))
+
+var $incr = document.getElementById('incr');
+var $decr = document.getElementById('decr');
+var $res = document.getElementById('res');
+
+var incrStream = Rx.Observable.fromEvent($incr, 'click');
+var decrStream = Rx.Observable.fromEvent($decr, 'click');
+var clickStream = Rx.Observable.merge(incrStream.mapTo('INCR'), decrStream.mapTo('DECR'));
+
+clickStream.subscribe((action) => console.log(action))
+clickStream.subscribe((action) => {
+    var currentVal = Number($res.innerHTML) ;
+    var newVal = 0;
+    switch (action) {
+        case 'INCR':
+            newVal = currentVal + 1
+            break;
+        case 'DECR':
+            newVal = currentVal - 1
+            break;
+        default:
+            newVal = "erreur"
+    }
+    $res.innerHTML = newVal + '';
+
+})
+
+// $incr.addEventListener('click', () => {
+//     currentVal = Number($res.innerHTML);
+//     var newVal = currentVal + 1;
+//     $res.innerHTML = newVal + '';
+// })
+// $decr.addEventListener('click', () => {
+//     currentVal = Number($res.innerHTML);
+//     var newVal = currentVal - 1;
+//     $res.innerHTML = newVal + '';
+// })
+
+</script>
+</body>
+</html>
